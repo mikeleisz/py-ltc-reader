@@ -138,25 +138,36 @@ def decode_ltc(wave_frames):
         else:
             sp += 1
 def start_read_ltc():
-    t = threading.Thread(target=print_tc)
-    t.start()
+    # t = threading.Thread(target=print_tc)
+    # t.start()
+
     p = pyaudio.PyAudio()
+    info = p.get_host_api_info_by_index(0)
+    numdevices = info.get('deviceCount')
+
+    for i in range(0, numdevices):
+        if (p.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
+            print("Input Device id ", i, " - ", p.get_device_info_by_host_api_device_index(0, i).get('name'))
+
     stream = p.open(format=FORMAT,
-                    channels=CHANNELS,
-                    rate=RATE,
-                    input=True,
-                    frames_per_buffer=CHUNK)
+                   channels=CHANNELS,
+                   rate=RATE,
+                   input=True,
+                   input_device_index=1,
+                   frames_per_buffer=CHUNK)
+
     print("Capturando LTC")
     frames = []
+
     try:
-        while True:
-            data = stream.read(CHUNK)
-            decode_ltc(data)
-            frames.append(data)
+       while True:
+           data = stream.read(CHUNK)
+           decode_ltc(data)
+           frames.append(data)
     except:
-        jam = None
-        print("Programa fechado")
-        input()
-        stream.stop_stream()
-        stream.close()
-        p.terminate()
+       jam = None
+       print("Programa fechado")
+       input()
+       stream.stop_stream()
+       stream.close()
+       p.terminate()
