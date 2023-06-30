@@ -4,7 +4,6 @@ import audioop
 import time
 import threading
 import os
-#113,119,101
 
 
 CHUNK = 2048
@@ -14,30 +13,31 @@ RATE = 48000
 SYNC_WORD = '0011111111111101'
 jam = '00:00:00:00'
 now_tc = '00:00:00:00'
-#1byte,1byte,1byte,1byte,1byte
 last_cam = '-1'
 jam_advice = False
 jammed = False
 
-codes = [49,50,51,52,53,54,55,56,57,48]
+codes = [49, 50, 51, 52, 53, 54, 55, 56, 57, 48]
 cams = {}
 
-for i,j in enumerate(codes):
+for i, j in enumerate(codes):
     cams[j] = str(i+1)
-    
+
+
 def bin_to_bytes(a,size=1):
-    ret = int(a,2).to_bytes(size,byteorder='little')
+    ret = int(a, 2).to_bytes(size, byteorder='little')
     return ret
+
 
 def bin_to_int(a):
     out = 0
-    for i,j in enumerate(a):
+    for i, j in enumerate(a):
         out += int(j)*2**i
     return out
 
+
 def decode_frame(frame):
     o = {}
-    # TODO other decodes
     o['frame_units'] = bin_to_int(frame[:4])
     o['user_bits_1'] = int.from_bytes(bin_to_bytes(frame[4:8]),byteorder='little')
     o['frame_tens'] = bin_to_int(frame[8:10])
@@ -68,33 +68,7 @@ def decode_frame(frame):
         o['frame_tens']*10+o['frame_units'],
     )
     return o
-    
-def print_tc():
-    global jam,now_tc
-    inter = 1/(24000/1000)
-    last_jam = jam
-    h,m,s,f = [int(x) for x in jam.split(':')]
-    while True:
-        if jam == None:
-            break
-        if jam != last_jam:
-            h,m,s,f = [int(x) for x in jam.split(':')]
-            last_jam = jam
-        tcp = "{:02d}:{:02d}:{:02d}:{:02d}".format(h,m,s,f)
-        os.system('clear')
-        print(tcp)
-        now_tc = tcp
-        time.sleep(inter)
-        f += 1
-        if f >= 24:
-            f = 0
-            s += 1
-        if s >= 60:
-            s = 0
-            m += 1
-        if m >= 60:
-            m = 0
-            h += 1
+
 
 def decode_ltc(wave_frames):
     global jam
@@ -105,9 +79,9 @@ def decode_ltc(wave_frames):
     toggle = True
     sp = 1
     first = True
-    for i in range(0,len(wave_frames),2):
+    for i in range(0, len(wave_frames), 2):
         data = wave_frames[i:i+2]
-        pos = audioop.minmax(data,2)
+        pos = audioop.minmax(data, 2)
         if pos[0] < 0:
             cyc = 'Neg'
         else:
@@ -131,43 +105,51 @@ def decode_ltc(wave_frames):
                             frames.append(output[-80:])
                             output = ''
                             os.system('clear')
-                            print('Jam received:',decode_frame(frames[-1])['formatted_tc'])
+                            print('Jam received:', decode_frame(frames[-1])['formatted_tc'])
                             jam = decode_frame(frames[-1])['formatted_tc']
             sp = 1
             last = cyc
         else:
             sp += 1
+
+
 def start_read_ltc():
     # t = threading.Thread(target=print_tc)
     # t.start()
 
     p = pyaudio.PyAudio()
     info = p.get_host_api_info_by_index(0)
-    numdevices = info.get('deviceCount')
+    num_devices = info.get('deviceCount')
 
-    for i in range(0, numdevices):
+    for i in range(0, num_devices):
         if (p.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
             print("Input Device id ", i, " - ", p.get_device_info_by_host_api_device_index(0, i).get('name'))
 
     stream = p.open(format=FORMAT,
-                   channels=CHANNELS,
-                   rate=RATE,
-                   input=True,
-                   input_device_index=1,
-                   frames_per_buffer=CHUNK)
+                    channels=CHANNELS,
+                    rate=RATE,
+                    input=True,
+                    input_device_index=1,
+                    frames_per_buffer=CHUNK)
 
-    print("Capturando LTC")
+    print("Capturing LTC")
     frames = []
 
     try:
-       while True:
-           data = stream.read(CHUNK)
-           decode_ltc(data)
-           frames.append(data)
+        while True:
+            data = stream.read(CHUNK)
+            decode_ltc(data)
+            frames.append(data)
     except:
-       jam = None
-       print("Programa fechado")
-       input()
-       stream.stop_stream()
-       stream.close()
-       p.terminate()
+        global jam
+        jam = None
+        print("LTC Reader Closing...")
+        # input()
+        stream.stop_stream()
+        stream.close()
+        p.terminate()
+
+
+def get_timecode():
+    global jam
+    return jam
